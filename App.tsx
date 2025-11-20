@@ -48,22 +48,7 @@ const App: React.FC = () => {
 
   // --- Room Logic ---
 
-  const handleJoinRoom = async (name: string, code: string, isHost: boolean, avatar: string, color: string) => {
-      // Viewers must check if room exists first
-      if (!isHost) {
-          try {
-            const exists = await socketService.checkRoomAvailability(code);
-            if (!exists) {
-                alert("Room not found or Host is inactive! Please check the code.");
-                return;
-            }
-          } catch (e) {
-              console.error(e);
-              alert("Failed to check room.");
-              return;
-          }
-      }
-
+  const handleJoinRoom = (name: string, code: string, isHost: boolean, avatar: string, color: string) => {
       const userId = generateUserId();
       const user: User = {
           id: userId,
@@ -96,7 +81,7 @@ const App: React.FC = () => {
              id: data.userId,
              name: `StreamMate ${data.userId.substring(0,3)}`,
              role: UserRole.VIEWER,
-             avatar: `https://api.dicebear.com/9.x/bottts/svg?seed=${data.userId}`, // Fallback
+             avatar: `https://picsum.photos/seed/${data.userId}/50/50`, // Fallback
              isLocal: false
          };
          
@@ -115,13 +100,6 @@ const App: React.FC = () => {
              });
          }
       });
-
-      // HOST LOGIC: Reply to room checks
-      if (isHost) {
-          socketService.on('room:check', () => {
-              socketService.emit('room:available', { roomId: code });
-          });
-      }
 
       socketService.on('room:closed', () => {
           alert("The host has closed the room.");
@@ -420,9 +398,9 @@ const App: React.FC = () => {
       style={{ '--theme-color': currentUser.color || '#7652d6' } as React.CSSProperties}
     >
       {/* Header - Compact */}
-      <header className="h-12 md:h-16 border-b border-white/5 flex items-center justify-between px-4 bg-skin-500 shadow-lg shadow-skin-500/20 z-50 shrink-0">
+      <header className="h-12 md:h-16 border-b border-white/5 flex items-center justify-between px-4 bg-black/40 backdrop-blur-md z-50 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white/20 flex items-center justify-center text-white font-black text-xs md:text-sm backdrop-blur-md">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-skin-500 flex items-center justify-center text-white font-black text-xs md:text-sm shadow-lg shadow-skin-500/20">
             SM
           </div>
           <div>
@@ -430,8 +408,8 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-4">
-           <div className={`flex items-center gap-2 text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 rounded-full font-bold border bg-black/20 border-white/10 backdrop-blur-sm text-white`}>
-               <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${currentUser.role === UserRole.HOST ? 'bg-yellow-400' : 'bg-blue-400'} animate-pulse`}></div>
+           <div className={`flex items-center gap-2 text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 rounded-full font-bold border ${currentUser.role === UserRole.HOST ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-blue-500/10 border-blue-500/30 text-blue-400'}`}>
+               <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${currentUser.role === UserRole.HOST ? 'bg-yellow-500' : 'bg-blue-500'} animate-pulse`}></div>
                {currentUser.role === UserRole.HOST ? 'HOST' : 'VIEWER'}
            </div>
         </div>

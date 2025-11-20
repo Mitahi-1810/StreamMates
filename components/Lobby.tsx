@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Play, Users, Zap, MonitorPlay } from 'lucide-react';
+import { createAvatar } from '@dicebear/core';
+import { bottts } from '@dicebear/collection';
 
 interface LobbyProps {
   onJoin: (name: string, roomId: string, isHost: boolean, avatar: string, color: string) => void;
@@ -22,28 +24,27 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
   const [mode, setMode] = useState<'start' | 'join'>('start');
   const [seed, setSeed] = useState(Math.random().toString());
   const [color, setColor] = useState(COLORS[6]);
-  const [isLoading, setIsLoading] = useState(false);
 
   const generateRoomCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
-  // Use API URL instead of library import to prevent crashes
-  const getAvatarUrl = (seedStr: string, colorHex: string) => 
-    `https://api.dicebear.com/9.x/bottts/svg?seed=${seedStr}&backgroundColor=${colorHex.replace('#', '')}`;
+  const avatarSvg = createAvatar(bottts, {
+    seed: seed,
+    size: 128,
+    radius: 50,
+    backgroundColor: [color.replace('#', '')],
+  }).toString();
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     const code = generateRoomCode();
-    onJoin(name, code, true, getAvatarUrl(seed, color), color);
+    onJoin(name, code, true, `data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`, color);
   };
 
-  const handleJoin = async (e: React.FormEvent) => {
+  const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !roomCode.trim()) return;
-    setIsLoading(true);
-    // Pass control back to App to handle async checks
-    await onJoin(name, roomCode.toUpperCase(), false, getAvatarUrl(seed, color), color);
-    setIsLoading(false);
+    onJoin(name, roomCode.toUpperCase(), false, `data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`, color);
   };
 
   return (
@@ -56,7 +57,7 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
         
         {/* Left Panel: Branding */}
         <div className="p-10 bg-gradient-to-br from-pawry-800/50 to-black/50 flex flex-col justify-center items-center text-center border-b md:border-b-0 md:border-r border-white/5">
-             <div className="w-24 h-24 rounded-3xl flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.1)] mb-6 rotate-3 hover:rotate-6 transition-transform duration-500" style={{backgroundColor: color}}>
+             <div className="w-24 h-24 bg-gradient-to-tr from-neon-pink to-purple-600 rounded-3xl flex items-center justify-center shadow-[0_0_30px_rgba(168,85,247,0.4)] mb-6 rotate-3 hover:rotate-6 transition-transform duration-500">
                  <span className="text-4xl font-black text-white tracking-tighter">SM</span>
              </div>
              <h1 className="text-4xl font-bold text-white mb-3 tracking-tight">StreamMates</h1>
@@ -105,7 +106,7 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
                      onClick={() => setSeed(Math.random().toString())}
                      title="Click to randomize avatar"
                    >
-                       <img src={getAvatarUrl(seed, color)} alt="Avatar" className="w-full h-full" />
+                       <img src={`data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`} alt="Avatar" className="w-full h-full" />
                    </div>
                    <div className="flex-1">
                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Theme Color</label>
@@ -150,13 +151,9 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
                 </div>
               )}
 
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-neon-pink to-purple-600 hover:from-neon-pink/90 hover:to-purple-600/90 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 mt-2 hover:translate-y-[-1px] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                  {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : (mode === 'start' ? <Play size={20} fill="currentColor" /> : <Users size={20} />)}
-                  {isLoading ? 'Checking...' : (mode === 'start' ? 'Start Hosting' : 'Join Stream')}
+              <button type="submit" className="w-full bg-gradient-to-r from-neon-pink to-purple-600 hover:from-neon-pink/90 hover:to-purple-600/90 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 mt-2 hover:translate-y-[-1px]">
+                  {mode === 'start' ? <Play size={20} fill="currentColor" /> : <Users size={20} />}
+                  {mode === 'start' ? 'Start Hosting' : 'Join Stream'}
               </button>
           </form>
         </div>
