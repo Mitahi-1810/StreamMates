@@ -17,21 +17,6 @@ class MockSocketService {
     this.channel.onmessage = (event) => {
       const { roomId, event: eventName, data } = event.data;
       
-      // --- SYSTEM HANDLERS ---
-      
-      // Ping/Pong for Room Discovery (Allow joining only if Host is online)
-      if (eventName === 'system:ping') {
-          // If I am connected to this room (likely as Host or existing member), confirm it exists
-          if (this.roomId === roomId) {
-              this.channel.postMessage({ 
-                  roomId, 
-                  event: 'system:pong', 
-                  data: { responderId: this.userId } 
-              });
-          }
-          return;
-      }
-
       // --- APP HANDLERS ---
 
       // Only process messages for the current room
@@ -39,36 +24,6 @@ class MockSocketService {
           this.trigger(eventName, data);
       }
     };
-  }
-
-  // Check if a room exists by pinging it and waiting for a response
-  checkRoom(roomId: string): Promise<boolean> {
-      return new Promise((resolve) => {
-          let resolved = false;
-          
-          // Temporary listener for the pong
-          const pongHandler = (ev: MessageEvent) => {
-              const { roomId: rId, event } = ev.data;
-              if (rId === roomId && event === 'system:pong') {
-                  resolved = true;
-                  this.channel.removeEventListener('message', pongHandler);
-                  resolve(true);
-              }
-          };
-
-          this.channel.addEventListener('message', pongHandler);
-          
-          // Send Ping
-          this.channel.postMessage({ roomId, event: 'system:ping', data: {} });
-
-          // Timeout after 2 seconds
-          setTimeout(() => {
-              if (!resolved) {
-                  this.channel.removeEventListener('message', pongHandler);
-                  resolve(false);
-              }
-          }, 1500);
-      });
   }
 
   connect(userId: string, roomId: string) {

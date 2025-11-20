@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Play, Users, Zap, MonitorPlay, Loader2, AlertCircle } from 'lucide-react';
 import { createAvatar } from '@dicebear/core';
 import { bottts } from '@dicebear/collection';
-import { socketService } from '../services/mockSocket';
+import { mongoDb } from '../services/mongo';
 
 interface LobbyProps {
   onJoin: (name: string, roomId: string, isHost: boolean, avatar: string, color: string) => void;
@@ -39,12 +39,30 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
     backgroundColor: [color.replace('#', '')],
   }).toString();
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+    
+    setIsLoading(true);
     const code = generateRoomCode();
-    // No check needed for creating
-    onJoin(name, code, true, `data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`, color);
+
+    // Create Room in DB
+    await mongoDb.collection('rooms').insertOne({
+        _id: crypto.randomUUID(),
+        code: code,
+        hostId: '', // Will be filled in App.tsx join handler logic or passed here? 
+                    // Ideally passed here, but we generate UserID in App. Let's pass flow.
+        users: [],
+        isActive: true,
+        createdAt: Date.now(),
+        settings: { themeColor: color }
+    });
+
+    // Small delay to simulate network
+    setTimeout(() => {
+        setIsLoading(false);
+        onJoin(name, code, true, `data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`, color);
+    }, 500);
   };
 
   const handleJoin = async (e: React.FormEvent) => {
@@ -56,13 +74,26 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
     
     const formattedCode = roomCode.toUpperCase();
 
-    // Check if room exists via socket ping
-    const exists = await socketService.checkRoom(formattedCode);
-    
-    if (exists) {
-        onJoin(name, formattedCode, false, `data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`, color);
-    } else {
-        setError("Room not found. Please check the code or ensure the Host is online.");
+    // DATABASE CHECK: Does room exist?
+    try {
+        const room = await mongoDb.collection('rooms').findOne({ code: formattedCode });
+        
+        if (!room) {
+            throw new Error("Room not found. Please check the code.");
+        }
+
+        if (!room.isActive) {
+            throw new Error("This room has been closed by the host.");
+        }
+
+        // Success
+        setTimeout(() => {
+             setIsLoading(false);
+             onJoin(name, formattedCode, false, `data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`, color);
+        }, 600);
+
+    } catch (err: any) {
+        setError(err.message || "Failed to join room.");
         setIsLoading(false);
     }
   };

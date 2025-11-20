@@ -6,6 +6,7 @@ import ChatPanel from './components/ChatPanel';
 import Controls from './components/Controls';
 import Lobby from './components/Lobby';
 import { socketService } from './services/mockSocket';
+import { mongoDb } from './services/mongo';
 
 const generateUserId = () => Math.random().toString(36).substring(2, 9);
 
@@ -49,7 +50,7 @@ const App: React.FC = () => {
 
   // --- Room Logic ---
 
-  const handleJoinRoom = (name: string, code: string, isHost: boolean, avatar: string, color: string) => {
+  const handleJoinRoom = async (name: string, code: string, isHost: boolean, avatar: string, color: string) => {
       const userId = generateUserId();
       const user: User = {
           id: userId,
@@ -60,10 +61,34 @@ const App: React.FC = () => {
           color: color
       };
 
+      // DB: Add user to room
+      await mongoDb.collection('rooms').updateOne(
+          { code: code },
+          { $push: { users: user } }
+      );
+      
+      // If Host, set HostID if not set (redundancy check)
+      if (isHost) {
+          await mongoDb.collection('rooms').updateOne(
+              { code: code },
+              { $set: { hostId: userId } }
+          );
+      }
+
+      // Retrieve current list of users from DB for initial state
+      const roomDoc = await mongoDb.collection('rooms').findOne({ code });
+      if (roomDoc) {
+          // Mark local user
+          const dbUsers = roomDoc.users.map(u => ({ ...u, isLocal: u.id === userId }));
+          setUsers(dbUsers);
+      } else {
+          setUsers([user]);
+      }
+
       setCurrentUser(user);
       setRoomId(code);
       setInRoom(true);
-      setUsers([user]);
+      
       setMessages([{
           id: 'sys-1',
           userId: 'system',
@@ -77,19 +102,18 @@ const App: React.FC = () => {
       socketService.connect(userId, code);
 
       // Setup listeners
-      socketService.on('user:joined', (data: { userId: string }) => {
-         const newUser: User = {
-             id: data.userId,
-             name: `StreamMate ${data.userId.substring(0,3)}`,
-             role: UserRole.VIEWER,
-             avatar: `https://picsum.photos/seed/${data.userId}/50/50`, // Fallback
-             isLocal: false
-         };
-         
-         setUsers(prev => {
-             if (prev.find(u => u.id === newUser.id)) return prev;
-             return [...prev, newUser];
-         });
+      socketService.on('user:joined', async (data: { userId: string }) => {
+         // Refresh user list from DB to get full profile
+         const updatedRoom = await mongoDb.collection('rooms').findOne({ code });
+         if (updatedRoom) {
+             const newUser = updatedRoom.users.find(u => u.id === data.userId);
+             if (newUser) {
+                setUsers(prev => {
+                    if (prev.find(u => u.id === newUser.id)) return prev;
+                    return [...prev, { ...newUser, isLocal: false }];
+                });
+             }
+         }
 
          // Announce logic
          if (currentUserRef.current?.role === UserRole.HOST) {
@@ -110,7 +134,18 @@ const App: React.FC = () => {
          }
       });
 
-      socketService.on('room:closed', () => {
+      socketService.on('user:left', async (data: { userId: string }) => {
+          // Remove from DB
+          await mongoDb.collection('rooms').updateOne(
+              { code },
+              { $pull: { users: { id: data.userId } } }
+          );
+          setUsers(prev => prev.filter(u => u.id !== data.userId));
+      });
+
+      socketService.on('room:closed', async () => {
+          // Deactivate in DB
+          await mongoDb.collection('rooms').updateOne({ code }, { $set: { isActive: false } });
           alert("The host has closed the room.");
           window.location.reload();
       });
@@ -175,9 +210,15 @@ const App: React.FC = () => {
       socketService.on('signal', handleSignal);
   };
 
-  const handleCloseRoom = () => {
+  const handleCloseRoom = async () => {
       socketService.emit('room:closed', {});
       handleStopScreenShare();
+      
+      // DB: Deactivate Room
+      if (roomId) {
+          await mongoDb.collection('rooms').updateOne({ code: roomId }, { $set: { isActive: false } });
+      }
+
       socketService.disconnect();
       setInRoom(false);
       setRoomId('');
@@ -412,9 +453,9 @@ const App: React.FC = () => {
       style={{ '--theme-color': currentUser.color || '#7652d6' } as React.CSSProperties}
     >
       {/* Header - Compact */}
-      <header className="h-12 md:h-16 border-b border-white/5 flex items-center justify-between px-4 bg-black/40 backdrop-blur-md z-50 shrink-0">
+      <header className="h-12 md:h-16 border-b border-white/5 flex items-center justify-between px-4 bg-skin-500 shadow-lg shadow-skin-600/20 z-50 shrink-0 transition-colors duration-300">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-skin-500 flex items-center justify-center text-white font-black text-xs md:text-sm shadow-lg shadow-skin-500/20">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-black/20 flex items-center justify-center text-white font-black text-xs md:text-sm shadow-inner">
             SM
           </div>
           <div>
@@ -422,8 +463,8 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-4">
-           <div className={`flex items-center gap-2 text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 rounded-full font-bold border ${currentUser.role === UserRole.HOST ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-blue-500/10 border-blue-500/30 text-blue-400'}`}>
-               <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${currentUser.role === UserRole.HOST ? 'bg-yellow-500' : 'bg-blue-500'} animate-pulse`}></div>
+           <div className={`flex items-center gap-2 text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 rounded-full font-bold border bg-black/20 border-white/10 text-white`}>
+               <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${currentUser.role === UserRole.HOST ? 'bg-yellow-400' : 'bg-blue-400'} animate-pulse`}></div>
                {currentUser.role === UserRole.HOST ? 'HOST' : 'VIEWER'}
            </div>
         </div>

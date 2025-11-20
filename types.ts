@@ -70,3 +70,17 @@ export interface StreamAction {
   type: 'play' | 'pause';
   timestamp: number;
 }
+
+// --- DATABASE SCHEMAS ---
+
+export interface Room {
+  _id: string;
+  code: string;
+  hostId: string;
+  users: User[];
+  isActive: boolean;
+  createdAt: number;
+  settings: {
+    themeColor: string;
+  };
+}
