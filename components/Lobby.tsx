@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
-import { Play, Users, Zap, MonitorPlay } from 'lucide-react';
+import { Play, Users, Zap, MonitorPlay, Loader2, AlertCircle } from 'lucide-react';
 import { createAvatar } from '@dicebear/core';
 import { bottts } from '@dicebear/collection';
+import { socketService } from '../services/mockSocket';
 
 interface LobbyProps {
   onJoin: (name: string, roomId: string, isHost: boolean, avatar: string, color: string) => void;
@@ -24,6 +26,9 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
   const [mode, setMode] = useState<'start' | 'join'>('start');
   const [seed, setSeed] = useState(Math.random().toString());
   const [color, setColor] = useState(COLORS[6]);
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const generateRoomCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -38,13 +43,28 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
     e.preventDefault();
     if (!name.trim()) return;
     const code = generateRoomCode();
+    // No check needed for creating
     onJoin(name, code, true, `data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`, color);
   };
 
-  const handleJoin = (e: React.FormEvent) => {
+  const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !roomCode.trim()) return;
-    onJoin(name, roomCode.toUpperCase(), false, `data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`, color);
+    
+    setIsLoading(true);
+    setError(null);
+    
+    const formattedCode = roomCode.toUpperCase();
+
+    // Check if room exists via socket ping
+    const exists = await socketService.checkRoom(formattedCode);
+    
+    if (exists) {
+        onJoin(name, formattedCode, false, `data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`, color);
+    } else {
+        setError("Room not found. Please check the code or ensure the Host is online.");
+        setIsLoading(false);
+    }
   };
 
   return (
@@ -57,7 +77,10 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
         
         {/* Left Panel: Branding */}
         <div className="p-10 bg-gradient-to-br from-pawry-800/50 to-black/50 flex flex-col justify-center items-center text-center border-b md:border-b-0 md:border-r border-white/5">
-             <div className="w-24 h-24 bg-gradient-to-tr from-neon-pink to-purple-600 rounded-3xl flex items-center justify-center shadow-[0_0_30px_rgba(168,85,247,0.4)] mb-6 rotate-3 hover:rotate-6 transition-transform duration-500">
+             <div 
+                className="w-24 h-24 rounded-3xl flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.2)] mb-6 rotate-3 hover:rotate-6 transition-transform duration-500"
+                style={{backgroundColor: color}}
+             >
                  <span className="text-4xl font-black text-white tracking-tighter">SM</span>
              </div>
              <h1 className="text-4xl font-bold text-white mb-3 tracking-tight">StreamMates</h1>
@@ -84,13 +107,13 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
           {/* Toggle */}
           <div className="flex bg-black/40 p-1.5 rounded-xl mb-8 border border-white/5">
             <button 
-                onClick={() => setMode('start')}
+                onClick={() => { setMode('start'); setError(null); }}
                 className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${mode === 'start' ? 'bg-pawry-600 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}
             >
                 New Room
             </button>
             <button 
-                onClick={() => setMode('join')}
+                onClick={() => { setMode('join'); setError(null); }}
                 className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${mode === 'join' ? 'bg-pawry-600 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}
             >
                 Join Room
@@ -142,7 +165,7 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
                     <input 
                         type="text" 
                         value={roomCode}
-                        onChange={(e) => setRoomCode(e.target.value)}
+                        onChange={(e) => { setRoomCode(e.target.value); setError(null); }}
                         className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-neon-pink focus:ring-1 focus:ring-neon-pink/50 transition-all uppercase tracking-widest font-mono text-lg"
                         placeholder="ABCD12"
                         maxLength={8}
@@ -151,9 +174,24 @@ const Lobby: React.FC<LobbyProps> = ({ onJoin }) => {
                 </div>
               )}
 
-              <button type="submit" className="w-full bg-gradient-to-r from-neon-pink to-purple-600 hover:from-neon-pink/90 hover:to-purple-600/90 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 mt-2 hover:translate-y-[-1px]">
-                  {mode === 'start' ? <Play size={20} fill="currentColor" /> : <Users size={20} />}
-                  {mode === 'start' ? 'Start Hosting' : 'Join Stream'}
+              {error && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center gap-2 text-red-400 text-xs">
+                      <AlertCircle size={16} />
+                      <span>{error}</span>
+                  </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-neon-pink to-purple-600 hover:from-neon-pink/90 hover:to-purple-600/90 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 mt-2 hover:translate-y-[-1px] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                  {isLoading ? (
+                      <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    mode === 'start' ? <Play size={20} fill="currentColor" /> : <Users size={20} />
+                  )}
+                  {isLoading ? 'Connecting...' : (mode === 'start' ? 'Start Hosting' : 'Join Stream')}
               </button>
           </form>
         </div>

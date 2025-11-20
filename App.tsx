@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { VideoState, VideoSourceType, ChatMessage, User, UserRole, SignalMessage, StreamAction, Reaction } from './types';
 import VideoPlayer from './components/VideoPlayer';
@@ -91,13 +92,21 @@ const App: React.FC = () => {
          });
 
          // Announce logic
-         if (currentUserRef.current?.role === UserRole.HOST && videoStateRef.current.isStreaming) {
-             // Announce stream availability to new user
-             socketService.emit('signal', {
-                 type: 'host_ready',
-                 sender: currentUserRef.current.id,
-                 target: data.userId
-             });
+         if (currentUserRef.current?.role === UserRole.HOST) {
+             // 1. CRITICAL: Sync Video State immediately so new user knows we are live
+             if (videoStateRef.current.isStreaming) {
+                 console.log("Syncing state to new user...");
+                 socketService.emit('video:sync', videoStateRef.current);
+             }
+
+             // 2. Start WebRTC handshake if streaming
+             if (videoStateRef.current.isStreaming) {
+                 socketService.emit('signal', {
+                     type: 'host_ready',
+                     sender: currentUserRef.current.id,
+                     target: data.userId
+                 });
+             }
          }
       });
 
@@ -107,6 +116,7 @@ const App: React.FC = () => {
       });
 
       socketService.on('video:sync', (remoteState: Partial<VideoState>) => {
+        console.log("Received video state sync:", remoteState);
         setVideoState(prevState => {
             if (remoteState.sourceType === VideoSourceType.IDLE) {
                  // Stream ended
@@ -212,7 +222,10 @@ const App: React.FC = () => {
       try {
           switch (msg.type) {
               case 'host_ready':
+                  // Host is signaling they are ready. 
+                  // Viewer should respond with a join request to start the handshake.
                   if (currentUserRef.current.role === UserRole.VIEWER) {
+                      console.log("Host is ready, sending join request...");
                       socketService.emit('signal', {
                           type: 'join_request',
                           sender: myId,
@@ -223,6 +236,7 @@ const App: React.FC = () => {
 
               case 'join_request':
                   if (currentUserRef.current.role === UserRole.HOST && localStreamRef.current) {
+                      console.log("Received join request from", senderId);
                       const pc = createPeerConnection(senderId);
                       localStreamRef.current.getTracks().forEach(track => {
                           pc.addTrack(track, localStreamRef.current!);
