@@ -24,6 +24,35 @@ class MockSocketService {
     };
   }
 
+  // New Method: Check if a host is active in the given room
+  checkRoomAvailability(roomId: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        const listener = (event: MessageEvent) => {
+            const msg = event.data;
+            if (msg.roomId === roomId && msg.event === 'room:available') {
+                this.channel.removeEventListener('message', listener);
+                clearTimeout(timeout);
+                resolve(true);
+            }
+        };
+        
+        // We need a raw listener because we aren't connected to the room yet
+        this.channel.addEventListener('message', listener);
+
+        // Broadcast check
+        this.channel.postMessage({ 
+            roomId: roomId, 
+            event: 'room:check', 
+            data: { senderId: 'temp-checker' } 
+        });
+
+        const timeout = setTimeout(() => {
+            this.channel.removeEventListener('message', listener);
+            resolve(false);
+        }, 2000);
+    });
+  }
+
   connect(userId: string, roomId: string) {
     this.userId = userId;
     this.roomId = roomId;

@@ -4,40 +4,42 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>StreamMates</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              skin: {
-                400: 'color-mix(in srgb, var(--theme-color), white 20%)',
-                500: 'var(--theme-color)',
-                600: 'color-mix(in srgb, var(--theme-color), black 10%)',
-                700: 'color-mix(in srgb, var(--theme-color), black 20%)',
+      window.tailwind = {
+        config: {
+          theme: {
+            extend: {
+              colors: {
+                skin: {
+                  400: 'color-mix(in srgb, var(--theme-color), white 20%)',
+                  500: 'var(--theme-color)',
+                  600: 'color-mix(in srgb, var(--theme-color), black 10%)',
+                  700: 'color-mix(in srgb, var(--theme-color), black 20%)',
+                },
+                pawry: {
+                  900: '#1a0b2e',
+                  800: '#2d1b4e',
+                  700: '#432c7a',
+                  600: '#5b3ea8',
+                  500: '#7652d6',
+                  400: '#9674e2',
+                  300: '#b79af0',
+                  100: '#e0d4fc',
+                },
+                neon: {
+                  pink: '#ff00ff',
+                  cyan: '#00ffff',
+                }
               },
-              pawry: {
-                900: '#1a0b2e',
-                800: '#2d1b4e',
-                700: '#432c7a',
-                600: '#5b3ea8',
-                500: '#7652d6',
-                400: '#9674e2',
-                300: '#b79af0',
-                100: '#e0d4fc',
-              },
-              neon: {
-                pink: '#ff00ff',
-                cyan: '#00ffff',
+              animation: {
+                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
               }
             },
-            animation: {
-              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            }
           },
-        },
+        }
       }
     </script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
       /* Custom scrollbar for chat */
       .scrollbar-hide::-webkit-scrollbar {
@@ -59,9 +61,7 @@
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@dicebear/core": "https://aistudiocdn.com/@dicebear/core@^9.2.4",
-    "@dicebear/collection": "https://aistudiocdn.com/@dicebear/collection@^9.2.4"
+    "react": "https://aistudiocdn.com/react@^19.2.0"
   }
 }
 </script>
