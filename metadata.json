@@ -1,0 +1,9 @@
+{
+  "name": "Copy of StreamMates",
+  "description": "Synchronized screen sharing and watch parties.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera",
+    "display-capture"
+  ]
+}
